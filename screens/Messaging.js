@@ -1,35 +1,38 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   TextInput,
   Text,
   FlatList,
   TouchableOpacity,
+  ScrollView,
 } from "react-native";
-import socket from "../utils/socket";
+import { auth } from "../utils/firebase";
 import MessageComponent from "../component/MessageComponent";
 import { Ionicons } from "@expo/vector-icons";
 import { styles } from "../utils/styles";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const Messaging = ({ route, navigation }) => {
+let socket;
+const Messaging = () => {
   const [user, setUser] = useState("");
-  const { name, id } = route.params;
-  // route and navigation need
-
   const [chatMessages, setChatMessages] = useState([]);
   const [message, setMessage] = useState("");
+  useEffect(() => {
+    socket = new WebSocket(
+      "wss://api.finanalyst.ai/ws/startInterview",
+      "protocolOne"
+    );
+  }, []);
 
-  const getEmail = async () => {
-    try {
-      const value = await AsyncStorage.getItem("email");
-      if (value !== null) {
-        setUser(value);
-      }
-    } catch (e) {
-      console.error("Error while loading email!");
+  useEffect(() => {
+    const userData = auth.currentUser;
+    if (!user) {
+      setUser(userData.email);
     }
-  };
+    socket.onopen = () => {
+      console.log("connected");
+      socket.send("connected server!");
+    };
+  }, [socket]);
 
   const handleNewMessage = () => {
     const hour =
@@ -42,33 +45,64 @@ const Messaging = ({ route, navigation }) => {
         ? `0${new Date().getMinutes()}`
         : `${new Date().getMinutes()}`;
 
-    if (user) {
-      socket.emit("newMessage", {
-        message,
-        room_id: id,
-        user,
-        timestamp: { hour, mins },
-      });
-      // socket.emit({
-      //   message: message,
-      //   type: "profit_loss",
-      //   token:
-      //     "eyJhbGciOiJSUzI1NiIsImtpZCI6IjNjOTNjMWEyNGNhZjgyN2I4ZGRlOWY4MmQyMzE1MzY1MDg4YWU2MTIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vZmludGVjaC01YzQzYyIsImF1ZCI6ImZpbnRlY2gtNWM0M2MiLCJhdXRoX3RpbWUiOjE3MTYzNjY4MTYsInVzZXJfaWQiOiJ1Nzh1R1E2WTkzU3dONzhCcVdpME5YQnhjRWEyIiwic3ViIjoidTc4dUdRNlk5M1N3Tjc4QnFXaTBOWEJ4Y0VhMiIsImlhdCI6MTcxNjM2NjgxNywiZXhwIjoxNzE2MzcwNDE3LCJlbWFpbCI6IncuZ29sbGlAcWluc2lnaHRzLmFpIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbIncuZ29sbGlAcWluc2lnaHRzLmFpIl19LCJzaWduX2luX3Byb3ZpZGVyIjoicGFzc3dvcmQifX0.DNV9--6j85WdwS4QEde7M3o6JKtZPejzi54__12-JaysqfwCnByDmJ88LT7xajpfgYsgZl8C_W0JaNAeiSd89TSxu2N3NTxvT1tkd0EqvXpTAykYyaUJp1GwApwVVSyUVYMhzBOq01gUqPwTf7h86fT-B-IRANABIhQbJz__QwCAf1o1RaVQqpx8ivwjlNXardbheKUKForjG_sJR11z-giMlPc9pKY9dbmWZF6cD3JKoj5MTESaOTdCb-W0cqnSOaxSPqDO2JeQ5X1-pOCb9vORINz62F6_gqct9tGWUwzmEzJOOhuftiUtYXdRsR-0VN9vELSHVeIBzYVYqVIUVw",
-      // });
-      setMessage("");
-    }
+    const data = {
+      message: message,
+      type: "profit_loss",
+      token:
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6IjNjOTNjMWEyNGNhZjgyN2I4ZGRlOWY4MmQyMzE1MzY1MDg4YWU2MTIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vZmludGVjaC01YzQzYyIsImF1ZCI6ImZpbnRlY2gtNWM0M2MiLCJhdXRoX3RpbWUiOjE3MTYzNjY4MTYsInVzZXJfaWQiOiJ1Nzh1R1E2WTkzU3dONzhCcVdpME5YQnhjRWEyIiwic3ViIjoidTc4dUdRNlk5M1N3Tjc4QnFXaTBOWEJ4Y0VhMiIsImlhdCI6MTcxNjM2NjgxNywiZXhwIjoxNzE2MzcwNDE3LCJlbWFpbCI6IncuZ29sbGlAcWluc2lnaHRzLmFpIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbIncuZ29sbGlAcWluc2lnaHRzLmFpIl19LCJzaWduX2luX3Byb3ZpZGVyIjoicGFzc3dvcmQifX0.DNV9--6j85WdwS4QEde7M3o6JKtZPejzi54__12-JaysqfwCnByDmJ88LT7xajpfgYsgZl8C_W0JaNAeiSd89TSxu2N3NTxvT1tkd0EqvXpTAykYyaUJp1GwApwVVSyUVYMhzBOq01gUqPwTf7h86fT-B-IRANABIhQbJz__QwCAf1o1RaVQqpx8ivwjlNXardbheKUKForjG_sJR11z-giMlPc9pKY9dbmWZF6cD3JKoj5MTESaOTdCb-W0cqnSOaxSPqDO2JeQ5X1-pOCb9vORINz62F6_gqct9tGWUwzmEzJOOhuftiUtYXdRsR-0VN9vELSHVeIBzYVYqVIUVw",
+    };
+
+    setChatMessages([
+      ...chatMessages,
+      {
+        text: message,
+        user: user,
+        time: hour + ":" + mins,
+      },
+    ]);
+
+    socket.send(JSON.stringify(data));
+    socket.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      console.log(msg);
+      setChatMessages([
+        ...chatMessages,
+        {
+          text: "received the message",
+          user: "server",
+          time: hour + ":" + mins,
+        },
+      ]);
+      console.log("err: ", error);
+    };
+    setMessage("");
   };
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: name });
-    getEmail();
-    socket.emit("findRoom", id);
-    socket.on("foundRoom", (roomChats) => setChatMessages(roomChats));
-  }, []);
-
   useEffect(() => {
-    socket.on("foundRoom", (roomChats) => setChatMessages(roomChats));
-  }, [socket]);
+    const hour =
+      new Date().getHours() < 10
+        ? `0${new Date().getHours()}`
+        : `${new Date().getHours()}`;
+
+    const mins =
+      new Date().getMinutes() < 10
+        ? `0${new Date().getMinutes()}`
+        : `${new Date().getMinutes()}`;
+
+    if (
+      chatMessages.length &&
+      chatMessages[chatMessages.length - 1].text !== "received the message"
+    ) {
+      setChatMessages([
+        ...chatMessages,
+        {
+          text: "received the message",
+          user: "server",
+          time: hour + ":" + mins,
+        },
+      ]);
+    }
+  }, [chatMessages]);
 
   return (
     <View style={styles.messagingscreen}>
@@ -78,17 +112,13 @@ const Messaging = ({ route, navigation }) => {
           { paddingVertical: 15, paddingHorizontal: 10 },
         ]}
       >
-        {chatMessages[0] ? (
-          <FlatList
-            data={chatMessages}
-            renderItem={({ item }) => (
-              <MessageComponent item={item} user={user} />
-            )}
-            keyExtractor={(item) => item.id}
-          />
-        ) : (
-          ""
-        )}
+        <ScrollView>
+          {chatMessages.map((chat, index) => (
+            <React.Fragment key={index}>
+              <MessageComponent item={chat} user={user} />
+            </React.Fragment>
+          ))}
+        </ScrollView>
       </View>
 
       <View style={styles.messaginginputContainer}>
